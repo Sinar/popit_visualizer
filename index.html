@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>People and Org Explorer</title>
+    <!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+
+    <style>
+
+        .link {
+          stroke: #aaa;
+        }
+
+        .node text {
+            stroke:#333;
+            cursos:pointer;
+            }
+
+        .node circle{
+            stroke:#fff;
+            stroke-width:3px;
+            fill:#555;
+            }
+
+        .d3-tip {
+          line-height: 1;
+          font-weight: bold;
+          padding: 12px;
+          background: rgba(0, 0, 0, 0.8);
+          color: #fff;
+          border-radius: 2px;
+        }
+        dt:after {
+          content: ": ";
+        }
+
+        .searchItem {
+            position: relative;
+            border: 1px solid darkgrey;
+            height: 300px;
+
+        }
+        .searchImg {
+            position: absolute;
+            left: 0px;
+            width: 200px;
+        }
+        .searchData {
+
+            margin-left: 200px;
+        }
+
+
+
+    </style>
+</head>
+<body>
+    <form name="inputForm" onsubmit="return handleClick()" class="form-inline">
+        <div class="form-group">
+            <input type="text" name="searchForm" id="searchForm" class="form-control" />
+        </div>
+        <div class="form-group">
+            <select name="entityForm" id="entityForm" class="form-control">
+                <option value="persons">Person</option>
+                <option value="organizations">Organizations</option>
+                <option value="posts">Post</option>
+            </select>
+        </div>
+
+        <button type="button" value="search" onclick="return callSearch()" class="btn btn-primary">Search</button>
+
+    </form>
+    <script>
+        var data = {
+            "nodes":[],
+            "links":[]
+        };
+
+        var typeColor = {
+            "persons": 1,
+            "organizations": 2,
+            "posts": 3
+        };
+
+        d3.selection.prototype.show = function() {
+          this.style('display', 'initial');
+          return this;
+        };
+
+        d3.selection.prototype.hide = function() {
+          this.style('display', 'none');
+          return this;
+        };
+
+        var color = d3.scale.category10();
+        var api_endpoint = "http://api.popit.sinarproject.org/en";
+        var instance;
+
+        var width = 960,
+            height = 500;
+
+        var svg = d3.select("body").append("div").attr("id", "graph").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var search_div = d3.select("body").append("div").attr("id", "search");
+        var search_item = d3.select("body").selectAll("class", "searchItem");
+        search_div.hide();
+        //search_item.hide();
+
+        var force = d3.layout.force()
+                .nodes(data.nodes)
+                .links(data.links)
+                .charge(-400)
+                .linkDistance(100)
+                .size([width, height])
+                .on("tick", tick);
+
+        var node = svg.selectAll(".node"),
+            link = svg.selectAll(".link");
+
+
+        var tip = d3.tip().attr('class', 'd3-tip').html(function(d){ return d.name; });
+
+        svg.call(tip);
+        console.log(window.location.search);
+
+
+        entity_param = getQueryVariable("entity");
+        entity_id_param = getQueryVariable("entity_id");
+        if(entity_param && entity_id_param){
+            //updateGraph("persons", "545e43465222837c2c0589cc");
+            updateGraph(entity_param, entity_id_param);
+        }
+
+
+        function updateGraph(entity, entity_id){
+            promise = requestNode(entity, entity_id);
+            promise.then(addNode,
+                function(error){
+                    console.log(error);
+                });
+        }
+
+        function getQueryVariable(variable)
+        {
+               var query = window.location.search.substring(1);
+               var vars = query.split("&");
+               for (var i=0;i<vars.length;i++) {
+                       var pair = vars[i].split("=");
+                       if(pair[0] == variable){return pair[1];}
+               }
+               return(false);
+        }
+
+        function callSearch(){
+            data = {
+                "nodes":[],
+                "links":[]
+            };
+            node.remove();
+            link.remove();
+            render();
+            svg.hide();
+            entity = document.getElementById("entityForm").value;
+            query = document.getElementById("searchForm").value;
+
+            url = api_endpoint + "/search/" + entity + "?q=" + query;
+            d3.json(url, function(error, resp){
+                results = resp.results;
+
+                d3.select("body").select("div").select("#search").data(results).enter().append("div")
+                        .attr("class","searchItem")
+                        .html(function(d){
+                            if(d.image){
+                                image = d.image;
+                            }
+                            else{
+                                image = "https://upload.wikimedia.org/wikipedia/commons/7/7c/Image_PlaceHolder.png"
+                            }
+                            output = "<img class='searchImg' src='"+ image+"'>"+"<div class='searchData'><dl>" +
+                                    "<dt>name</dt>" +
+                                    "<dd>"+d.name+"</dd>" +
+                                    "<dt>Birth Date</dt>" +
+                                    "<dd>"+d.birth_date+"</dd>" +
+                                    "</dl>" +
+                                    "<a href='?entity="+entity+"&entity_id="+d.id+"' class='btn btn-primary' role='button'>Explore</a></div>";
+                            return output;
+                        });
+                search_div.show();
+                console.log(d3.select("body").selectAll(".searchIem"));
+            });
+
+
+        }
+
+        function requestNode(entity, entity_id){
+            url = api_endpoint + "/" + entity + "/" + entity_id;
+            var promise = new Promise(function(resolve, reject){
+                d3.json(url, function(error, resp){
+                    if(error) reject(error);
+                    instance = resp.result;
+                    instance.memberships.forEach(function (element, index, array) {
+                        if(element["post_id"]) {
+                            post_url = api_endpoint + "/" + "posts" + element["post_id"];
+                            post_promise = new Promise(function(resolve, reject){
+                                d3.json(post_url, function (error, resp) {
+                                    if(error) reject(error);
+                                   resolve(resp.result);
+                                });
+                            });
+                            post_promise.then(
+                                    function(result){
+                                        instance.post = result;
+                                    }
+                            )
+                        }
+                        person_url = api_endpoint + "/" + "persons" + element["person_id"];
+                        person_promise = new Promise(function(resolve, reject){
+                            d3.json(person_url, function (error, resp) {
+                               if(error) reject(error);
+                               resolve(resp.result);
+                            });
+                        });
+                        person_promise.then(
+                             function(result){
+                                 instance.person = result;
+                             }
+                        );
+
+                        organization_url = api_endpoint + "/" + "organizations" + element["organization_id"];
+                        organization_promise = new Promise(function(resolve, reject) {
+                            d3.json(person_url, function (error, resp) {
+                               if(error) reject(error);
+                               resolve(resp.result);
+                            });
+                        });
+
+                        organization_promise.then(
+                                function(result){
+                                    instance.organization = result;
+                                }
+                        );
+
+                    });
+                    output = { instance:instance, entity: entity};
+                    resolve(output);
+                });
+            });
+            return promise
+        }
+
+        function addNode(api_result){
+            result = api_result.instance;
+            entity = api_result.entity;
+
+            if(entity=="posts"){
+                name = result.label;
+            }
+            else{
+                name = result.name;
+            }
+            parent_index = nodeIndex(entity, result.id);
+            if(parent_index < 0){
+                parent = {name:name, id: result.id, entity: entity , group: typeColor[entity]};
+                data.nodes.push(parent);
+            }
+            else{
+                parent = data.nodes[parent_index];
+            }
+
+            result.memberships.forEach(function(element, index, array){
+
+                person_index = nodeIndex("persons", element["person_id"]);
+                if(person_index < 0){
+                    person = {name:element.person.name, id: element["person_id"], entity: "persons", group: typeColor["persons"] };
+                    data.nodes.push(person);
+                }
+                else{
+                    person = data.nodes[person_index];
+                }
+
+                organization_index = nodeIndex("organizations", element["organization_id"]);
+                if(organization_index < 0){
+                    organization = {name:element.organization.name, id: element["organization_id"], entity: "organizations", group: typeColor["organizations"] };
+                    data.nodes.push(organization);
+                }
+                else{
+                    organization = data.nodes[organization_index];
+                }
+                if(element["post_id"]){
+                    post_index = nodeIndex("posts", element["post_id"]);
+                    if(post_index < 0){
+                        post = {name:element.post.label, id: element["post_id"], entity: "posts", group: typeColor["posts"]};
+                        data.nodes.push(post);
+                    }
+                    else{
+
+                        post = data.nodes[post_index];
+                    }
+
+                }
+                if(entity == "persons"){
+                    if(element["post_id"]){
+                        post_link_index = linkIndex(post, parent);
+                        if(post_link_index < 0){
+                            data.links.push({source: post, target:parent});
+                        }
+
+                        org_link_index = linkIndex(post, organization);
+                        if(org_link_index < 0){
+                            data.links.push({source: post, target:organization});
+                        }
+
+                    }
+                    else{
+                        org_link_index = linkIndex(organization, parent);
+                        if(org_link_index < 0){
+                            data.links.push({source: organization, target:parent});
+                        }
+                    }
+                }
+                else if(entity == "organizations"){
+                    if(element["post_id"]){
+                        post_link_index = linkIndex(post, parent);
+                        if(post_link_index < 0){
+                            data.links.push({source: post, target:parent});
+                        }
+                        person_link_index = linkIndex(post, person);
+                        if(person_link_index < 0){
+                            data.links.push({source: post, target:person});
+                        }
+
+                    }
+                    else{
+                        person_link_index = linkIndex(person, parent);
+                        if(person_link_index < 0){
+                            data.links.push({source:person, target:parent})
+                        }
+
+                    }
+                }
+                else if(entity == "posts"){
+                    person_link_index = linkIndex(person, parent);
+                    if(person_link_index < 0){
+                        data.links.push({source:person, target:parent})
+                    }
+                    org_link_index = linkIndex(organization, parent);
+                    if(org_link_index < 0){
+                        data.links.push({source: organization, target:parent});
+                    }
+
+                }
+
+            });
+            render();
+        }
+
+        function render(){
+          console.log(data);
+          link = link.data(force.links(), function(d) { return d.source.id + "-" + d.target.id; });
+          link.enter().insert("line", ".node").attr("class", "link");
+          link.exit().remove();
+
+          node = node.data(force.nodes(), function(d) { return d.id;});
+          node.enter().append("circle").attr("class", function(d) { return "node " + d.id; }).attr("r", 8)
+                  .style("fill", function (d) {
+                      return color(d.group);
+                  })
+                  .on("mouseover",tip.show)
+                  .on("mouseout", tip.hide)
+                  .on("click", function (d) {
+                      console.log(d);
+                      promise = requestNode(d.entity, d.id );
+                        promise.then(addNode,
+                            function(error){
+                                console.log(error);
+                        });
+
+                  });
+          node.exit().remove();
+
+          force.start();
+        }
+        function tick() {
+          node.attr("cx", function(d) { return d.x; })
+              .attr("cy", function(d) { return d.y; });
+
+          link.attr("x1", function(d) { return d.source.x; })
+              .attr("y1", function(d) { return d.source.y; })
+              .attr("x2", function(d) { return d.target.x; })
+              .attr("y2", function(d) { return d.target.y; });
+        }
+
+        function nodeIndex(entity, entity_id){
+            nodes = data.nodes;
+            console.log(nodes);
+            index = -1;
+            for(i=0;i<nodes.length; i++){
+                if(nodes[i]["entity"] == entity && nodes[i]["id"] == entity_id){
+                    index = i;
+                    break;
+                }
+            }
+            return index;
+        }
+
+        function linkIndex(source, target) {
+            links = data.links;
+            index = -1;
+
+            for (i = 0; i < links.length; i++) {
+                if (links[i]["source"].id == source.id && links[i]["target"].id == target.id) {
+                    index = i;
+                    break;
+                }
+            }
+            return index;
+        }
+
+    </script>
+</body>
+</html>
