@@ -112,15 +112,15 @@
         var api_endpoint = "http://api.popit.sinarproject.org/en";
         var instance;
 
-        // TODO: Make position based on screen 
-        var width = 500,
-            height = 300;
+        // TODO: Make position based on screen
+        var width = 960,
+            height = 500;
 
         var svg = d3.select("body").append("div").attr("id", "graph")
                 .classed("svg-container", true)
                 .append("svg")
                 .attr("preserveAspectRatio", "xMinYMin meet")
-                .attr("viewBox", "0 0 600 400")
+                .attr("viewBox", "0 0 960 500")
                 .classed("svg-content-responsive", true);
 
         var search_div = d3.select("body")
