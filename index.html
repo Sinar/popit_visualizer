@@ -58,7 +58,7 @@
     </style>
 </head>
 <body>
-    <form name="inputForm" onsubmit="return handleClick()" class="form-inline">
+    <form name="inputForm" onsubmit="return callSearch()" class="form-inline">
         <div class="form-group">
             <input type="text" name="searchForm" id="searchForm" class="form-control" />
         </div>
@@ -70,7 +70,7 @@
             </select>
         </div>
 
-        <button type="button" value="search" onclick="return callSearch()" class="btn btn-primary">Search</button>
+        <button type="submit" value="search" onclick="return callSearch()" class="btn btn-primary">Search</button>
 
     </form>
     <script>
@@ -194,7 +194,7 @@
                 console.log(d3.select("body").selectAll(".searchIem"));
             });
 
-
+            return false;
         }
 
         function requestNode(entity, entity_id){
