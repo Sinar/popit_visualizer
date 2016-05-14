@@ -54,7 +54,20 @@
         }
 
 
-
+        .svg-container {
+            display: inline-block;
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%; /* aspect ratio */
+            vertical-align: top;
+            overflow: hidden;
+        }
+        .svg-content-responsive {
+            display: inline-block;
+            position: absolute;
+            top: 10px;
+            left: 0;
+        }
     </style>
 </head>
 <body>
@@ -99,14 +112,20 @@
         var api_endpoint = "http://api.popit.sinarproject.org/en";
         var instance;
 
-        var width = 960,
-            height = 500;
+        // TODO: Make position based on screen 
+        var width = 500,
+            height = 300;
 
-        var svg = d3.select("body").append("div").attr("id", "graph").append("svg")
-            .attr("width", width)
-            .attr("height", height);
+        var svg = d3.select("body").append("div").attr("id", "graph")
+                .classed("svg-container", true)
+                .append("svg")
+                .attr("preserveAspectRatio", "xMinYMin meet")
+                .attr("viewBox", "0 0 600 400")
+                .classed("svg-content-responsive", true);
 
-        var search_div = d3.select("body").append("div").attr("id", "search");
+        var search_div = d3.select("body")
+                .append("div")
+                .attr("id", "search");
         var search_item = d3.select("body").selectAll("class", "searchItem");
         search_div.hide();
         //search_item.hide();
@@ -114,8 +133,8 @@
         var force = d3.layout.force()
                 .nodes(data.nodes)
                 .links(data.links)
-                .charge(-400)
-                .linkDistance(100)
+                .charge(-200)
+                .linkDistance(20)
                 .size([width, height])
                 .on("tick", tick);
 
@@ -123,7 +142,10 @@
             link = svg.selectAll(".link");
 
 
-        var tip = d3.tip().attr('class', 'd3-tip').html(function(d){ return d.name; });
+        var tip = d3.tip().attr('class', 'd3-tip').html(function(d){
+
+            return d.name + " [click to see more]";
+        });
 
         svg.call(tip);
         console.log(window.location.search);
@@ -165,6 +187,7 @@
             link.remove();
             render();
             svg.hide();
+            d3.select("body").select("#graph").hide();
             entity = document.getElementById("entityForm").value;
             query = document.getElementById("searchForm").value;
 
@@ -366,7 +389,7 @@
           link.exit().remove();
 
           node = node.data(force.nodes(), function(d) { return d.id;});
-          node.enter().append("circle").attr("class", function(d) { return "node " + d.id; }).attr("r", 8)
+          node.enter().append("circle").attr("class", function(d) { return "node " + d.id; }).attr("r", 4)
                   .style("fill", function (d) {
                       return color(d.group);
                   })
