@@ -68,6 +68,22 @@
             top: 10px;
             left: 0;
         }
+
+        div.infowindow {
+            position: fixed;
+            right: 10px;
+            top: 50px;
+            width: 300px;
+            border: 1px solid darkgrey;
+        }
+
+        img.infoimg {
+            width: 200px;
+        }
+
+        dl.infodetail {
+            left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -86,6 +102,7 @@
         <button type="submit" value="search" onclick="return callSearch()" class="btn btn-primary">Search</button>
 
     </form>
+
     <script>
         var data = {
             "nodes":[],
@@ -127,6 +144,7 @@
                 .append("div")
                 .attr("id", "search");
         var search_item = d3.select("body").selectAll("class", "searchItem");
+        var infowindow = d3.select("body").append("div").attr("class", "infowindow").text("boom");
         search_div.hide();
         //search_item.hide();
 
@@ -187,6 +205,7 @@
             link.remove();
             render();
             svg.hide();
+            d3.select(".infowindow").hide();
             d3.select("body").select("#graph").hide();
             entity = document.getElementById("entityForm").value;
             query = document.getElementById("searchForm").value;
@@ -198,17 +217,21 @@
                 d3.select("body").select("div").select("#search").data(results).enter().append("div")
                         .attr("class","searchItem")
                         .html(function(d){
-                            if(d.image){
-                                image = d.image;
-                            }
-                            else{
-                                image = "https://upload.wikimedia.org/wikipedia/commons/7/7c/Image_PlaceHolder.png"
-                            }
-                            output = "<img class='searchImg' src='"+ image+"'>"+"<div class='searchData'><dl>" +
-                                    "<dt>name</dt>" +
-                                    "<dd>"+d.name+"</dd>" +
-                                    "<dt>Birth Date</dt>" +
-                                    "<dd>"+d.birth_date+"</dd>" +
+                            name_data = returnName(d);
+                            start_date_data = returnStartDate(d);
+                            end_date_data = returnEndDate(d);
+                            description_data = returnDescription(d);
+                            image_data = returnImage(d);
+
+                            output = "<img class='searchImg' src='"+ image_data+"'>"+"<div class='searchData'><dl>" +
+                                    "<dt>"+name_data.key+"</dt>" +
+                                    "<dd>"+name_data.name+"</dd>" +
+                                    "<dt>Description</dt>" +
+                                    "<dd>"+description_data+"</dd>" +
+                                    "<dt>"+start_date_data.key+"</dt>" +
+                                    "<dd>"+start_date_data.start_date+"</dd>" +
+                                    "<dt>"+end_date_data.key+"</dt>" +
+                                    "<dd>"+end_date_data.end_date+"</dd>" +
                                     "</dl>" +
                                     "<a href='?entity="+entity+"&entity_id="+d.id+"' class='btn btn-primary' role='button'>Explore</a></div>";
                             return output;
@@ -279,6 +302,8 @@
         function addNode(api_result){
             result = api_result.instance;
             entity = api_result.entity;
+
+            renderInfoWindow(result);
 
             if(entity=="posts"){
                 name = result.label;
@@ -395,7 +420,7 @@
                   })
                   .on("mouseover",tip.show)
                   .on("mouseout", tip.hide)
-                  .on("click", function (d) {
+                  .on("dblclick", function (d) {
                       console.log(d);
                       promise = requestNode(d.entity, d.id );
                         promise.then(addNode,
@@ -403,11 +428,114 @@
                                 console.log(error);
                         });
 
+                  })
+                  .on("click", function(d){
+                      url = api_endpoint + "/" + d.entity + "/" + d.id;
+                      info_promise = new Promise(function(resolve, reject){
+                          d3.json(url, function(error, resp){
+                              if(error) reject(error);
+                              resolve(resp.result);
+                          });
+                      });
+                      d3.select(".infowindow").html("loading....");
+                      info_promise.then(function(resp){
+                          renderInfoWindow(resp);
+                      },
+                      function(error){
+                          console.log(error);
+                      });
+
                   });
           node.exit().remove();
 
           force.start();
         }
+
+        function renderInfoWindow(resp){
+            name_data = returnName(resp);
+            start_date_data = returnStartDate(resp);
+            end_date_data = returnEndDate(resp);
+            description_data = returnDescription(resp);
+            image_data = returnImage(resp);
+            output = "<img class='infoimg' src='" + image_data + "'>" +
+                    "<dl class='infodetail'>" +
+                            "<dt>"+name_data.key+"</dt>" +
+                            "<dd>"+name_data.name+"</dd>" +
+                            "<dt>Description</dt>" +
+                            "<dd>"+description_data+"</dd>" +
+                            "<dt>"+start_date_data.key+"</dt>" +
+                            "<dd>"+start_date_data.start_date+"</dd>" +
+                            "<dt>"+end_date_data.key+"</dt>" +
+                            "<dd>"+end_date_data.end_date+"</dd>" +
+                            "</dl>";
+            d3.select(".infowindow").html(output);
+        }
+
+        function returnImage(result){
+            console.log(result);
+            if(result.image){
+                return result.image;
+            }
+            return "https://upload.wikimedia.org/wikipedia/commons/7/7c/Image_PlaceHolder.png"
+        }
+
+        function returnName(result){
+            if(result.label){
+                key = "label";
+                name = result.label;
+            }
+            else{
+                key = "name";
+                name = result.name;
+            }
+            return { "key": key, "name": name }
+        }
+
+        function returnStartDate(result){
+            if("start_date" in result){
+                key = "start date";
+                start_date = result.start_date;
+            }
+            else if("birth_date" in result){
+                key = "Birth Date";
+                start_date = result.birth_date;
+            }
+            else if("founding_date" in result){
+                key = "Founding Date";
+                start_date = result.founding_date;
+            }
+            return {"key": key, "start_date": start_date}
+        }
+
+        function returnEndDate(result){
+            if("death_date" in result){
+                key = "Death Date";
+                end_date = result.death_date;
+            }
+            else if("dissolution_date" in result){
+                key = "Dissolution Date";
+                end_date = result.dissolution_date;
+            }
+            else{
+                key = "End Date";
+                end_date = result.end_date;
+            }
+            return { "key":key, "end_date": end_date}
+        }
+
+        function returnDescription(result){
+            if("description" in result){
+                description = result.description;
+            }
+            else if("biography" in result){
+                description = result.biography;
+            }
+            else{
+                description = null;
+            }
+            return description;
+        }
+
         function tick() {
           node.attr("cx", function(d) { return d.x; })
               .attr("cy", function(d) { return d.y; });
