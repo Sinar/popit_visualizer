@@ -210,7 +210,7 @@
             entity = document.getElementById("entityForm").value;
             query = document.getElementById("searchForm").value;
 
-            url = api_endpoint + "/search/" + entity + "?q=" + query;
+            url = api_endpoint + "/search/" + entity + "?q=" + query + "&minify=false";
             d3.json(url, function(error, resp){
                 results = resp.results;
 
