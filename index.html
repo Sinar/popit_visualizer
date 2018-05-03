@@ -244,7 +244,7 @@
         }
 
         function requestNode(entity, entity_id){
-            url = api_endpoint + "/" + entity + "/" + entity_id;
+            url = api_endpoint + "/" + entity + "/" + entity_id + "?minify=false";
             var promise = new Promise(function(resolve, reject){
                 d3.json(url, function(error, resp){
                     if(error) reject(error);
